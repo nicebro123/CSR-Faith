@@ -34,7 +34,7 @@
 
 ```bash
 # 1. 安装
-git clone https://github.com/nicebro123/csr-faith && cd csr-faith
+git clone https://github.com/nicebro123/CSR-Faith && cd CSR-Faith
 pip install -r requirements.txt && pip install -e .
 
 # 2. 配置本机（数据盘 / GPU）
@@ -83,7 +83,7 @@ A_csr  = A_base · (α + (1-α) · step_cfs_mean)           # 步级因果调制
 代码仓库**只放代码**。模型权重、数据集、下载缓存、训练 checkpoint、日志**全部落到仓库之外的大盘目录** `DATA_ROOT`，并已被 `.gitignore` 排除，不会进版本库。
 
 ```
-csr-faith/                      # ← 本仓库（只有代码）
+CSR-Faith/                      # ← 本仓库（只有代码）
 ├── verl/                       # 训练框架 + CSR/CIT 核心实现
 │   ├── trainer/                #   core_algos.py（CSR advantage） / ray_trainer.py（训练循环集成）
 │   └── utils/                  #   causal_rationale.py / step_causal.py / counterfactual.py / answer_normalization.py
@@ -130,7 +130,7 @@ ray   transformers >= 4.49   datasets   tensordict
 ```
 
 ```bash
-git clone https://github.com/nicebro123/csr-faith && cd csr-faith
+git clone https://github.com/nicebro123/CSR-Faith && cd CSR-Faith
 pip install -r requirements.txt
 pip install -e .
 ```
