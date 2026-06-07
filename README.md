@@ -1,23 +1,36 @@
-# CSR-Faith / CIT-Faith
+# Causal Spatial Rationales for Faithful Multimodal Reasoning
 
-[![CI](https://github.com/nicebro123/csr-faith/actions/workflows/ci.yml/badge.svg)](https://github.com/nicebro123/csr-faith/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.9-blue)](#-环境安装)
+[![Method](https://img.shields.io/badge/method-CSR--Faith-green)](#核心贡献)
+[![Dataset](https://img.shields.io/badge/dataset-unchanged-orange)](#核心贡献)
 
-> **Faithful Multimodal Spatial Reasoning via Causal Spatial Rationales & Counterfactual Intervention Training**
-> 面向多模态空间推理的「忠实思维链」强化学习框架，基于 [SpatialThinker](https://github.com/hunarbatra/SpatialThinker) / [EasyR1](https://github.com/hiyouga/EasyR1) 代码基座。
+**CSR-Faith** 是一个面向多模态空间推理的忠实 CoT 强化学习框架。它不修改原始数据集，而是从已有场景图标注中自动派生空间因果证据，训练模型生成必要、充分、紧凑的视觉推理，并用 step-level counterfactual intervention 验证推理步骤是否真的影响答案。
 
-强化学习训练多模态空间推理时，思维链（CoT）容易沦为「装饰性文本」——看起来在推理，实际不影响答案。本仓库用两套可独立开关的方法解决这一问题：
+本仓库基于 [SpatialThinker](https://github.com/hunarbatra/SpatialThinker) / [EasyR1](https://github.com/hiyouga/EasyR1)，保留 **CIT-Faith** 作为可选对照路径，重点实现 **CSR-Faith: Causal Spatial Rationales**。
 
-| 方法 | 核心思想 | 是否需额外模型 |
-| --- | --- | --- |
-| **CIT-Faith** | 冻结 LLM Judge 评估自洽性(SC)/感知一致性(PR) + 反事实干预度量因果忠实性(CFS)，压制装饰性 CoT | 需审查模型(AWQ) |
-| **CSR-Faith**（重点） | **不改数据集**，从 GT 场景图派生「最小充分空间证据」，奖励必要/充分/紧凑的空间 CoT，并对**每个推理步**做反事实干预赋予步级因果信用 | 不需要 |
+强化学习训练多模态空间推理时，思维链（CoT）容易沦为「装饰性文本」：看起来在解释，实际答案并不依赖它。CSR-Faith 把这个问题拆成三个可度量目标：
+
+1. 自动构造空间因果证据：从已有 `<scene>` / `<answer>` 派生 rationale target。
+2. 奖励忠实视觉推理：覆盖必要事实，避免无关事实，保持紧凑且充分。
+3. 做步级因果验证：逐步干预 CoT，让策略模型续写答案，检查答案是否改变。
 
 📚 深入文档：[方法/模块详解](docs/method_and_modules.md) · [设计文档](docs/causal_spatial_rationales_dev.md) · [逐步执行手册](docs/csrfaith_run_guide.md)
 
 ---
 
-## ⚡ TL;DR 一键复现
+## 核心贡献
+
+| 模块 | 作用 | 额外数据/模型 |
+| --- | --- | --- |
+| **Causal Spatial Evidence** | 从原数据字段里的 GT scene graph 自动抽取对象、关系和答案相关证据 | 不改数据集 |
+| **CSR Reward** | 用 coverage / precision / compactness / sufficiency / necessity 奖励忠实空间 CoT | 不需要额外模型 |
+| **Step-level CFS** | 对每个推理步做关系翻转、实体交换、步掩码，再前缀续写答案 | 使用当前策略模型 |
+| **GRPO Integration** | 将 rationale score 与 step-CFS 注入 GRPO advantage，并保存/恢复拉格朗日乘子 | 训练框架内完成 |
+| **CIT-Faith Baseline** | LLM Judge 评估 SC/PR + counterfactual CFS，可作为对照或组合实验 | 需审查模型(AWQ) |
+
+---
+
+## 快速开始
 
 ```bash
 # 1. 安装
