@@ -170,14 +170,14 @@ vim scripts/env.local.sh
 
 ```bash
 # scripts/env.local.sh（本机实际值，已 gitignore）
-export DATA_ROOT="/data/csr_faith_assets"   # 数据/权重/checkpoint 根目录（指向大盘）
+export DATA_ROOT="../csr_faith_assets"      # 数据/权重/checkpoint 根目录（仓库同级目录）
 export CUDA_VISIBLE_DEVICES="0,1"           # 用哪几张卡
 export N_GPUS=2                             # 卡数（须与上面一致）
 export WANDB_MODE=offline                   # 日志离线，不需登录
 # export HF_ENDPOINT="https://hf-mirror.com"  # 国内无法直连 HF 时启用镜像
 ```
 
-> 不创建 `env.local.sh` 也能跑：用脚本内置默认值（`DATA_ROOT=$HOME/csr_faith_assets`、`CUDA_VISIBLE_DEVICES=1,2`、`N_GPUS=2`）。任何变量都可被 `env.local.sh` 或命令行覆盖。
+> 不创建 `env.local.sh` 也能跑：用脚本内置默认值（`DATA_ROOT=../csr_faith_assets`、`CUDA_VISIBLE_DEVICES=1,2`、`N_GPUS=2`）。任何变量都可被 `env.local.sh` 或命令行覆盖。
 
 ---
 

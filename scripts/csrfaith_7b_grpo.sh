@@ -20,8 +20,8 @@ export WANDB_MODE=${WANDB_MODE:-offline}
 export HF_ENDPOINT=${HF_ENDPOINT:-https://huggingface.co}
 
 # ── 代码与数据/权重分离 ──
-# 代码仓库只放代码；模型/数据集下载缓存与 checkpoint 全部落到 DATA_ROOT（建议指向大盘）。
-DATA_ROOT=${DATA_ROOT:-${HOME}/csr_faith_assets}
+# 代码仓库只放代码；模型/数据集下载缓存与 checkpoint 全部落到 DATA_ROOT（默认仓库同级相对目录）。
+DATA_ROOT=${DATA_ROOT:-../csr_faith_assets}
 export HF_HOME=${HF_HOME:-${DATA_ROOT}/hf_cache}     # 模型 + 数据集下载缓存
 CKPT_ROOT=${CKPT_ROOT:-${DATA_ROOT}/ckpts}           # checkpoint 输出根目录
 

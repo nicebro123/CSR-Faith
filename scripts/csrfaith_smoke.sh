@@ -6,8 +6,8 @@ if [ -f "${SCRIPT_DIR}/env.local.sh" ]; then
     source "${SCRIPT_DIR}/env.local.sh"
 fi
 
-# 代码与数据/权重分离：下载缓存落到 DATA_ROOT（建议指向大盘）。
-DATA_ROOT=${DATA_ROOT:-${HOME}/csr_faith_assets}
+# 代码与数据/权重分离：下载缓存落到 DATA_ROOT（默认仓库同级相对目录）。
+DATA_ROOT=${DATA_ROOT:-../csr_faith_assets}
 export HF_HOME=${HF_HOME:-${DATA_ROOT}/hf_cache}
 export WANDB_MODE=${WANDB_MODE:-offline}
 export HF_ENDPOINT=${HF_ENDPOINT:-https://huggingface.co}

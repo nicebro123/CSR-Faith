@@ -9,8 +9,8 @@
 # 因此每台机器维护自己的一份，互不影响，也不污染公共代码。
 # ──────────────────────────────────────────────────────────────
 
-# 数据 / 权重 / checkpoint 根目录（强烈建议指向大盘，与代码分离）
-export DATA_ROOT="${HOME}/csr_faith_assets"
+# 数据 / 权重 / checkpoint 根目录（默认放到仓库同级目录，与代码分离）
+export DATA_ROOT="../csr_faith_assets"
 
 # 使用哪几张 GPU，以及卡数（两者卡数必须一致）
 export CUDA_VISIBLE_DEVICES="0,1"
