@@ -171,10 +171,15 @@ vim scripts/env.local.sh
 ```bash
 # scripts/env.local.sh（本机实际值，已 gitignore）
 export DATA_ROOT="../csr_faith_assets"      # 数据/权重/checkpoint 根目录（仓库同级目录）
+export HF_HOME="${DATA_ROOT}/hf_cache"      # HuggingFace 下载缓存
+export CKPT_ROOT="${DATA_ROOT}/ckpts"       # checkpoint 输出目录
 export CUDA_VISIBLE_DEVICES="0,1"           # 用哪几张卡
 export N_GPUS=2                             # 卡数（须与上面一致）
 export WANDB_MODE=offline                   # 日志离线，不需登录
-# export HF_ENDPOINT="https://hf-mirror.com"  # 国内无法直连 HF 时启用镜像
+export HF_ENDPOINT="https://huggingface.co" # 国内无法直连时可改为 https://hf-mirror.com
+export MODEL_PATH="Qwen/Qwen2.5-VL-7B-Instruct"
+export DATA_FILE="hunarbatra/STVQA-7K"
+export CAUSAL_CRITIC_PATH="${CKPT_ROOT}/causal_spatial_critic"
 ```
 
 > 不创建 `env.local.sh` 也能跑：用脚本内置默认值（`DATA_ROOT=../csr_faith_assets`、`CUDA_VISIBLE_DEVICES=1,2`、`N_GPUS=2`）。任何变量都可被 `env.local.sh` 或命令行覆盖。
@@ -183,13 +188,17 @@ export WANDB_MODE=offline                   # 日志离线，不需登录
 
 ## 📦 数据与模型准备
 
-无需手动下载——首次训练会按 `env.local.sh` 设置**自动下载到 `$DATA_ROOT/hf_cache`**。也可提前预取：
+首次训练会按 `env.local.sh` 设置自动下载到 `$HF_HOME`。更推荐提前统一预取，避免训练时卡在下载：
 
 ```bash
-source scripts/env.local.sh
-export HF_HOME=$DATA_ROOT/hf_cache
-huggingface-cli download Qwen/Qwen2.5-VL-7B-Instruct          # 策略模型（必需）
-huggingface-cli download hunarbatra/STVQA-7K --repo-type dataset   # 数据集
+bash scripts/prepare_assets.sh
+```
+
+该脚本会读取 `scripts/env.local.sh`，创建 `DATA_ROOT/HF_HOME/CKPT_ROOT`，并下载 `MODEL_PATH` 与 `DATA_FILE`。如果只想下载其中一个：
+
+```bash
+bash scripts/prepare_assets.sh --model-only
+bash scripts/prepare_assets.sh --data-only
 ```
 
 | 资源 | 名称 | 说明 |
@@ -289,11 +298,11 @@ python3 scripts/model_merger.py --local_dir $DATA_ROOT/ckpts/csrfaith_7B/global_
 评估脚本来自上游 [SpatialThinker](https://github.com/hunarbatra/SpatialThinker)（`evaluation/evals.py`）。**必须在其 `evaluation/` 目录内运行**（脚本用 `from templates import ...`）：
 
 ```bash
-cd /path/to/SpatialThinker/evaluation
+cd ../SpatialThinker/evaluation
 python3 evals.py \
     --dataset blink-spatial \
     --template spatial_thinker \
-    --model_path $DATA_ROOT/ckpts/csrfaith_7B/global_step_75/actor/huggingface \
+    --model_path ../../csr_faith_assets/ckpts/csrfaith_7B/global_step_75/actor/huggingface \
     --processor_name Qwen/Qwen2.5-VL-7B-Instruct \
     --cuda 0 --batch_size 4
 ```

@@ -11,6 +11,9 @@
 
 # 数据 / 权重 / checkpoint 根目录（默认放到仓库同级目录，与代码分离）
 export DATA_ROOT="../csr_faith_assets"
+export HF_HOME="${DATA_ROOT}/hf_cache"
+export CKPT_ROOT="${DATA_ROOT}/ckpts"
+export CSR_CACHE_ROOT="${DATA_ROOT}/cache"
 
 # 使用哪几张 GPU，以及卡数（两者卡数必须一致）
 export CUDA_VISIBLE_DEVICES="0,1"
@@ -19,12 +22,12 @@ export N_GPUS=2
 # wandb 模式：offline（默认，纯本地）/ online（需 wandb login）/ disabled
 export WANDB_MODE=offline
 
-# HuggingFace 下载源：国内集群若无法直连 huggingface.co，取消下一行注释启用镜像
-# export HF_ENDPOINT="https://hf-mirror.com"
+# HuggingFace 下载源：默认官方；国内集群若无法直连 huggingface.co，可改成镜像
+export HF_ENDPOINT=${HF_ENDPOINT:-"https://huggingface.co"}
 
-# （可选）模型 / 数据集改用本地绝对路径而非自动下载
-# export MODEL_PATH="/path/to/Qwen2.5-VL-7B-Instruct"
-# export DATA_FILE="/path/to/STVQA-7K"
+# 模型 / 数据集；可以是 HF repo id，也可以改成本地相对/绝对路径
+export MODEL_PATH=${MODEL_PATH:-"Qwen/Qwen2.5-VL-7B-Instruct"}
+export DATA_FILE=${DATA_FILE:-"hunarbatra/STVQA-7K"}
 
-# （可选）Causal Spatial Critic checkpoint，用于 csrfaith_critic_*.sh
-# export CAUSAL_CRITIC_PATH="${DATA_ROOT}/ckpts/causal_spatial_critic"
+# Causal Spatial Critic checkpoint，用于 csrfaith_critic_*.sh
+export CAUSAL_CRITIC_PATH=${CAUSAL_CRITIC_PATH:-"${CKPT_ROOT}/causal_spatial_critic"}

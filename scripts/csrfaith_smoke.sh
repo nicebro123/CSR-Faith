@@ -2,18 +2,8 @@ set -x
 
 # 加载机器专属本地配置（与正式训练脚本一致），该文件不入库。见 scripts/env.local.example.sh
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "${SCRIPT_DIR}/env.local.sh" ]; then
-    source "${SCRIPT_DIR}/env.local.sh"
-fi
+source "${SCRIPT_DIR}/env.common.sh"
 
-# 代码与数据/权重分离：下载缓存落到 DATA_ROOT（默认仓库同级相对目录）。
-DATA_ROOT=${DATA_ROOT:-../csr_faith_assets}
-export HF_HOME=${HF_HOME:-${DATA_ROOT}/hf_cache}
-export WANDB_MODE=${WANDB_MODE:-offline}
-export HF_ENDPOINT=${HF_ENDPOINT:-https://huggingface.co}
-
-MODEL_PATH=${MODEL_PATH:-Qwen/Qwen2.5-VL-7B-Instruct}
-DATA_FILE=${DATA_FILE:-hunarbatra/STVQA-7K}
 # smoke 默认单卡；可被 env.local.sh / 外部 N_GPUS 覆盖
 N_GPUS=${N_GPUS:-1}
 

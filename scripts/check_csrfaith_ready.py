@@ -38,6 +38,8 @@ REQUIRED_FILES = (
     "scripts/build_causal_critic_dataset.py",
     "scripts/train_causal_spatial_critic.py",
     "scripts/evaluate_causal_spatial_critic.py",
+    "scripts/env.common.sh",
+    "scripts/prepare_assets.sh",
     "scripts/model_merger.py",
     "verl/trainer/main.py",
     "verl/trainer/ray_trainer.py",

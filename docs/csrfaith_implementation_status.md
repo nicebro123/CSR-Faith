@@ -43,6 +43,8 @@
   - `scripts/evaluate_causal_spatial_critic.py`
   - `scripts/csrfaith_critic_smoke.sh`
   - `scripts/csrfaith_critic_7b_grpo.sh`
+  - `scripts/env.common.sh`
+  - `scripts/prepare_assets.sh`
   - JSONL schema with `curriculum_phase` and `reward_vector`
   - lightweight hashed logistic critic checkpoint at `critic.json`
   - optional trainer hook via `algorithm.enable_causal_spatial_critic`
@@ -121,7 +123,7 @@ python3 scripts/build_csr_target_cache.py --input-json sample.json --output targ
 Current lightweight test count:
 
 ```text
-85 tests, 13 skipped
+87 tests, 13 skipped
 ```
 
 The skipped tests require training/runtime dependencies such as `numpy`, `torch`, `datasets`, and `transformers`, which are not installed in this local Python environment.

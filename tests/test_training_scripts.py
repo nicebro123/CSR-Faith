@@ -81,6 +81,22 @@ class TrainingScriptTest(unittest.TestCase):
             with self.subTest(script=os.path.relpath(path, REPO_ROOT)):
                 self.assertNotIn("trainer.logger=[", text)
 
+    def test_prepare_assets_centralizes_hf_downloads(self):
+        script = _read(os.path.join(SCRIPTS_DIR, "prepare_assets.sh"))
+        common = _read(os.path.join(SCRIPTS_DIR, "env.common.sh"))
+        self.assertIn("source \"${SCRIPT_DIR}/env.common.sh\"", script)
+        self.assertIn("source \"${COMMON_SCRIPT_DIR}/env.local.sh\"", common)
+        self.assertIn("export HF_HOME=\"${HF_HOME:-${DATA_ROOT}/hf_cache}\"", common)
+        self.assertIn("export MODEL_PATH=\"${MODEL_PATH:-Qwen/Qwen2.5-VL-7B-Instruct}\"", common)
+        self.assertIn("export DATA_FILE=\"${DATA_FILE:-hunarbatra/STVQA-7K}\"", common)
+        self.assertIn("--repo-type dataset", script)
+
+    def test_docs_use_prepare_assets_for_prefetch(self):
+        readme = _read(os.path.join(REPO_ROOT, "README.md"))
+        guide = _read(os.path.join(REPO_ROOT, "docs", "csrfaith_run_guide.md"))
+        self.assertIn("bash scripts/prepare_assets.sh", readme)
+        self.assertIn("bash scripts/prepare_assets.sh", guide)
+
 
 if __name__ == "__main__":
     unittest.main()

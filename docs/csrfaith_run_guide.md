@@ -49,77 +49,60 @@ pip install -e .
 
 ### 1.3 环境变量
 
-**代码与数据/权重分离（本项目采用）：** 代码仓库（`codespace/csr_faith`）只放代码；模型/数据集下载缓存和 checkpoint 全部落到同级大盘目录 `csr_assets`。布局：
+**代码与数据/权重分离（本项目采用）：** 代码仓库只放代码；模型/数据集下载缓存和 checkpoint 默认落到仓库同级目录 `../csr_faith_assets`。布局：
 
 ```
-/mnt/infini-data/test/quan_space/
-├── codespace/csr_faith/      ← 代码（当前仓库）
-└── csr_assets/               ← 其他（数据 / 权重 / checkpoint）
+CIT-Faith/                    ← 代码（当前仓库）
+../csr_faith_assets/          ← 其他（数据 / 权重 / checkpoint）
     ├── hf_cache/             ← HF_HOME：模型 + 数据集下载缓存
     └── ckpts/                ← 训练 checkpoint 输出
 ```
 
-训练脚本 `csrfaith_7b_grpo.sh` 头部已内置该重定向（`DATA_ROOT` → `HF_HOME` / `CKPT_ROOT`），**正常跑训练时无需手动 export 这些**。想换位置只改脚本里 `DATA_ROOT` 一行，或外部 `export DATA_ROOT=...` 覆盖。
+训练脚本和下载脚本都会读取 `scripts/env.local.sh`，统一使用 `DATA_ROOT`、`HF_HOME`、`CKPT_ROOT`、`MODEL_PATH`、`DATA_FILE`。想换位置只改 `env.local.sh`，或外部 `export DATA_ROOT=...` 覆盖。
 
 ```bash
-# 数据/权重根目录（脚本默认值，可改）
-export DATA_ROOT=/mnt/infini-data/test/quan_space/csr_assets
-# 下载缓存指向大盘（脚本会自动派生为 $DATA_ROOT/hf_cache）
-export HF_HOME=$DATA_ROOT/hf_cache
-export HF_HUB_ENABLE_HF_TRANSFER=1     # 可选：加速下载，需 pip install hf_transfer
-
-# 国内网络可选镜像
-# export HF_ENDPOINT=https://hf-mirror.com
-
-# 受限数据集 / 上传 checkpoint 时才需要登录
-# huggingface-cli login
-
-# wandb：脚本已内置 WANDB_MODE=offline，无需额外设置
+cp -n scripts/env.local.example.sh scripts/env.local.sh
+vim scripts/env.local.sh
 ```
 
 ---
 
-## 2. 下载模型权重
+## 2. 下载模型权重和数据集
 
-训练脚本里写的是 HF repo id（如 `Qwen/Qwen2.5-VL-7B-Instruct`），首次运行会**自动下载**到 `HF_HOME`。也可以提前手动拉取，避免训练时卡在下载：
+训练脚本里写的是 HF repo id（如 `Qwen/Qwen2.5-VL-7B-Instruct`），首次运行会自动下载到 `HF_HOME`。更推荐提前统一预取，避免训练时卡在下载：
 
 ```bash
-pip install -U "huggingface_hub[cli]"
+python3 -m pip install -U huggingface_hub
+bash scripts/prepare_assets.sh
+```
 
-# 策略模型（7B，必需）
-huggingface-cli download Qwen/Qwen2.5-VL-7B-Instruct --local-dir-use-symlinks False
+只下载模型或只下载数据：
 
-# 策略模型（3B，可选，低显存调试）
-huggingface-cli download Qwen/Qwen2.5-VL-3B-Instruct
+```bash
+bash scripts/prepare_assets.sh --model-only
+bash scripts/prepare_assets.sh --data-only
+```
 
-# 审查模型（仅当你要跑 CIT-Faith 时才需要）
-huggingface-cli download Qwen/Qwen2.5-7B-Instruct-AWQ
+国内网络可在 `scripts/env.local.sh` 里设置：
+
+```bash
+export HF_ENDPOINT="https://hf-mirror.com"
 ```
 
 ### 使用本地路径（离线集群）
 
-脚本顶部的 `MODEL_PATH` 支持改成本地目录。例如 `spatialthinker_7b_grpo.sh` 注释里就给了集群本地路径写法：
+`MODEL_PATH` 和 `DATA_FILE` 支持改成本地目录：
 
 ```bash
-# 在脚本里改，或 export 覆盖（smoke 脚本支持 env 覆盖）
-export MODEL_PATH=/data/hf_cache/Qwen2.5-VL-7B-Instruct
+export MODEL_PATH="../csr_faith_assets/local_models/Qwen2.5-VL-7B-Instruct"
+export DATA_FILE="../csr_faith_assets/local_datasets/STVQA-7K"
 ```
 
 ---
 
-## 3. 下载数据集
+## 3. 数据集字段约定
 
 CSR-Faith 训练**不修改数据集**，监督信号全部从 batch 已有字段（`problem` / `ground_truth` 内嵌 `<scene>`、`<answer>`）派生。
-
-数据集同样支持自动下载，也可手动预取：
-
-```bash
-# 主数据集（CSR / CIT 默认）
-huggingface-cli download hunarbatra/STVQA-7K --repo-type dataset
-
-# 备用小数据集（config.yaml 默认，调试用）
-huggingface-cli download hunarbatra/Clevr_SAT_3k --repo-type dataset
-```
 
 训练脚本里数据写法为 `名称@split`：
 
@@ -354,7 +337,7 @@ python3 scripts/model_merger.py --local_dir $DATA_ROOT/ckpts/csrfaith_7B/global_
 
 - 输入 `--local_dir` = actor 目录（内含 `model_world_size_*_rank_*.pt` FSDP 分片）。
 - **输出固定写到子目录 `{actor}/huggingface/`**（见 `model_merger.py` 的 `save_pretrained(hf_path)`）。
-- 因此**可被 `transformers` / `vllm` 加载的模型路径是 `$DATA_ROOT/ckpts/csrfaith_7B/global_step_75/actor/huggingface/`**（即 `/mnt/infini-data/test/quan_space/csr_assets/ckpts/...`），下游评估要用这个，而不是 `actor/` 本身（`actor/` 里只是分片，无法 `from_pretrained`）。
+- 因此**可被 `transformers` / `vllm` 加载的模型路径是 `$DATA_ROOT/ckpts/csrfaith_7B/global_step_75/actor/huggingface/`**。下游评估要用这个，而不是 `actor/` 本身（`actor/` 里只是分片，无法 `from_pretrained`）。
 
 ---
 
@@ -378,12 +361,12 @@ pip install mathruler qwen-vl-utils python-dotenv
 因此**必须先 `cd` 进 `evaluation/`**，否则会 `ModuleNotFoundError: templates`。
 
 ```bash
-cd /Users/quanquan/Desktop/SpatialThinker-main/evaluation
+cd ../SpatialThinker-main/evaluation
 
 python3 evals.py \
     --dataset blink-spatial \
     --template spatial_thinker \
-    --model_path /mnt/infini-data/test/quan_space/csr_assets/ckpts/csrfaith_7B/global_step_75/actor/huggingface \
+    --model_path ../../csr_faith_assets/ckpts/csrfaith_7B/global_step_75/actor/huggingface \
     --processor_name Qwen/Qwen2.5-VL-7B-Instruct \
     --cuda 0 \
     --batch_size 4
@@ -432,12 +415,10 @@ python3 evals.py \
 ```bash
 # 1. 装环境
 conda create -n csrfaith python=3.10 -y && conda activate csrfaith
-cd /path/to/cit-faith && pip install -r requirements.txt && pip install -e .
-export HF_HOME=/data/hf_cache
+cd /path/to/CIT-Faith && pip install -r requirements.txt && pip install -e .
 
 # 2. 预取模型 + 数据（可跳过，训练会自动下载）
-huggingface-cli download Qwen/Qwen2.5-VL-7B-Instruct
-huggingface-cli download hunarbatra/STVQA-7K --repo-type dataset
+bash scripts/prepare_assets.sh
 
 # 3. 离线自检（无 GPU）
 python3 -m unittest discover -s tests

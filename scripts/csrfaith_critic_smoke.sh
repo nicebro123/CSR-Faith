@@ -2,11 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "${SCRIPT_DIR}/env.local.sh" ]; then
-    source "${SCRIPT_DIR}/env.local.sh"
-fi
-
-CAUSAL_CRITIC_PATH=${CAUSAL_CRITIC_PATH:-}
+source "${SCRIPT_DIR}/env.common.sh"
 
 bash "${SCRIPT_DIR}/csrfaith_smoke.sh" \
     algorithm.enable_causal_spatial_critic=True \

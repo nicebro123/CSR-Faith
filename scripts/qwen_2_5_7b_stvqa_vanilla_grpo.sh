@@ -1,7 +1,7 @@
 set -x
 
 MODEL_PATH=${MODEL_PATH:-Qwen/Qwen2.5-VL-7B-Instruct}
-# MODEL_PATH=/gpfs/scratch/ehpc80/hf_cache_hb/huggingface/hub/models--Qwen--Qwen2.5-VL-3B-Instruct/snapshots/66285546d2b821cf421d4f5eb2576359d3770cd3/
+# MODEL_PATH="../csr_faith_assets/local_models/Qwen2.5-VL-7B-Instruct"
 
 FORMAT_PROMPT="""<image> You FIRST think about the reasoning process as an internal monologue and then provide the final answer.
 The reasoning process MUST BE enclosed within <think> </think> tags. The final answer MUST BE put within <answer> </answer> tags, and only return the final choice including the correct option and answer within the answer tags, e.g., <answer> ({correct_option}) {correct_answer} </answer>.
@@ -10,7 +10,7 @@ Q. """
 
 DATA_FILE=${DATA_FILE:-hunarbatra/STVQA-7K}
 N_GPUS=${N_GPUS:-4}
-# DATA_FILE="/gpfs/scratch/ehpc80/hf_cache_hb/huggingface/hub/datasets--hunarbatra--spatialthinker_vqa_10k_filtered/snapshots/c43e6d9272e395d79b2bee20bd62d1c4a529d636/data/"
+# DATA_FILE="../csr_faith_assets/local_datasets/STVQA-7K/data"
 
 
 python3 -m verl.trainer.main \
