@@ -52,12 +52,14 @@ from .metrics import compute_data_metrics, compute_throughout_metrics, compute_t
 # CIT-Faith and CSR-Faith imports
 from ..utils.reviewer import ReviewerModel, extract_answer_text
 from ..utils.counterfactual import compute_cfs_batch_indexed
+from ..utils.causal_critic_data import build_critic_examples
 from ..utils.causal_rationale import build_causal_rationale_target, extract_gt_scene_and_answer, score_rationale
 from ..utils.step_causal import (
     build_prefixes_for_step_interventions,
     compute_step_causal_score,
     generate_step_interventions,
 )
+from ..models.causal_spatial_critic import CausalSpatialCritic
 
 
 class Role(IntEnum):
@@ -474,12 +476,36 @@ class RayPPOTrainer:
         self.csrfaith_enabled = config.algorithm.enable_csrfaith
         self.lambda_coverage = config.algorithm.lambda_coverage_init
         self.lambda_step_cfs = config.algorithm.lambda_step_cfs_init
+        self.causal_spatial_critic = None
         if self.csrfaith_enabled:
             print("[CSR-Faith] Initializing causal spatial rationale optimization...")
             print(f"[CSR-Faith] Config: tau_coverage={config.algorithm.tau_coverage}, "
                   f"tau_step_cfs={config.algorithm.tau_step_cfs}, "
                   f"alpha={config.algorithm.csr_step_cfs_alpha}, "
                   f"dual_lr={config.algorithm.dual_lr}")
+            if config.algorithm.enable_causal_spatial_critic:
+                critic_path = config.algorithm.causal_critic_path
+                if critic_path:
+                    try:
+                        self.causal_spatial_critic = CausalSpatialCritic.load(critic_path)
+                        print(f"[CSR-Faith] Loaded Causal Spatial Critic from {critic_path}")
+                    except Exception as exc:
+                        if not config.algorithm.causal_critic_use_online_fallback:
+                            raise
+                        print(
+                            "[CSR-Faith] WARNING: Failed to load Causal Spatial Critic; "
+                            f"falling back to online step-CFS. Error: {exc}"
+                        )
+                elif not config.algorithm.causal_critic_use_online_fallback:
+                    raise ValueError(
+                        "algorithm.enable_causal_spatial_critic=True requires "
+                        "algorithm.causal_critic_path unless online fallback is enabled."
+                    )
+                else:
+                    print(
+                        "[CSR-Faith] WARNING: Causal Spatial Critic enabled without "
+                        "causal_critic_path; falling back to online step-CFS."
+                    )
 
         self._create_dataloader()
 
@@ -1117,11 +1143,52 @@ class RayPPOTrainer:
                                 step_decode_valid_ratios = [0.0] * batch_size
                                 step_max_scores = [0.0] * batch_size
                                 step_intervention_counts = [0] * batch_size
+                                causal_signal_is_critic = 0.0
 
-                                if (
-                                    self.config.algorithm.csr_max_steps > 0
-                                    and self.config.algorithm.csr_max_step_interventions > 0
-                                ):
+                                def _score_with_causal_critic() -> bool:
+                                    if self.causal_spatial_critic is None:
+                                        return False
+                                    any_scored = False
+                                    for idx, response_text in enumerate(response_texts):
+                                        if (
+                                            targets[idx].confidence
+                                            < self.config.algorithm.causal_critic_min_target_confidence
+                                        ):
+                                            continue
+                                        interventions = generate_step_interventions(
+                                            response_text=response_text,
+                                            target=targets[idx],
+                                            max_steps=self.config.algorithm.csr_max_steps,
+                                            max_interventions_per_step=(
+                                                self.config.algorithm.csr_max_step_interventions
+                                            ),
+                                            rollout_index=idx,
+                                        )
+                                        step_intervention_counts[idx] = len(interventions)
+                                        if not interventions:
+                                            continue
+
+                                        critic_examples = build_critic_examples(
+                                            problem=str(problems[idx]),
+                                            target=targets[idx],
+                                            response_text=response_text,
+                                            interventions=interventions,
+                                            counterfactual_answers=[],
+                                            uid=f"global{self.global_step}:rollout{idx}",
+                                            response_answer=original_answers[idx],
+                                            policy_checkpoint=f"global_step_{self.global_step}",
+                                            source="trainer_learned_critic",
+                                        )
+                                        critic_scores = self.causal_spatial_critic.score_batch(critic_examples)
+                                        if not critic_scores:
+                                            continue
+                                        step_cfs_scores[idx] = sum(critic_scores) / len(critic_scores)
+                                        step_decode_valid_ratios[idx] = 1.0
+                                        step_max_scores[idx] = max(critic_scores)
+                                        any_scored = True
+                                    return any_scored
+
+                                def _score_with_online_step_cfs() -> None:
                                     prompt_ids_batch = batch.batch["prompts"]
                                     prompt_attention = batch.batch["attention_mask"][:, :prompt_ids_batch.shape[1]]
 
@@ -1164,6 +1231,32 @@ class RayPPOTrainer:
                                         step_decode_valid_ratios[idx] = step_score.valid_ratio
                                         step_max_scores[idx] = step_score.max_score
 
+                                if (
+                                    self.config.algorithm.csr_max_steps > 0
+                                    and self.config.algorithm.csr_max_step_interventions > 0
+                                ):
+                                    if self.config.algorithm.enable_causal_spatial_critic:
+                                        try:
+                                            causal_signal_is_critic = 1.0 if _score_with_causal_critic() else 0.0
+                                        except Exception as exc:
+                                            if not self.config.algorithm.causal_critic_use_online_fallback:
+                                                raise
+                                            print(
+                                                "[CSR-Faith] WARNING: Causal Spatial Critic scoring failed; "
+                                                f"falling back to online step-CFS. Error: {exc}"
+                                            )
+                                            causal_signal_is_critic = 0.0
+                                            step_cfs_scores[:] = [-1.0] * batch_size
+                                            step_decode_valid_ratios[:] = [0.0] * batch_size
+                                            step_max_scores[:] = [0.0] * batch_size
+                                            step_intervention_counts[:] = [0] * batch_size
+                                            _score_with_online_step_cfs()
+                                        else:
+                                            if causal_signal_is_critic == 0.0:
+                                                _score_with_online_step_cfs()
+                                    else:
+                                        _score_with_online_step_cfs()
+
                                 step_cfs_scores_t = torch.tensor(step_cfs_scores, dtype=torch.float32)
                                 valid_step_cfs = [score for score in step_cfs_scores if score >= 0]
                                 csr_step_cfs_mean = (
@@ -1182,6 +1275,16 @@ class RayPPOTrainer:
                                 )
                                 metrics["csr/step_interventions_mean"] = (
                                     sum(step_intervention_counts) / max(len(step_intervention_counts), 1)
+                                )
+                                metrics["csr/causal_signal_is_critic"] = causal_signal_is_critic
+                                metrics["csr/critic_enabled"] = (
+                                    1.0 if self.config.algorithm.enable_causal_spatial_critic else 0.0
+                                )
+                                metrics["csr/critic_causal_mean"] = (
+                                    csr_step_cfs_mean if causal_signal_is_critic and csr_step_cfs_mean >= 0.0 else 0.0
+                                )
+                                metrics["csr/critic_valid_ratio"] = (
+                                    len(valid_step_cfs) / max(batch_size, 1) if causal_signal_is_critic else 0.0
                                 )
                                 metrics["csr/lambda_coverage"] = self.lambda_coverage
                                 metrics["csr/lambda_step_cfs"] = self.lambda_step_cfs

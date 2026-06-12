@@ -35,6 +35,37 @@
   - `scripts/check_csrfaith_ready.py`
   - `scripts/debug_csr_batch.py`
   - `scripts/build_csr_target_cache.py`
+- Causal Spatial Critic offline bridge pipeline:
+  - `verl/utils/causal_critic_data.py`
+  - `verl/models/causal_spatial_critic.py`
+  - `scripts/build_causal_critic_dataset.py`
+  - `scripts/train_causal_spatial_critic.py`
+  - `scripts/evaluate_causal_spatial_critic.py`
+  - `scripts/csrfaith_critic_smoke.sh`
+  - `scripts/csrfaith_critic_7b_grpo.sh`
+  - JSONL schema with `curriculum_phase` and `reward_vector`
+  - lightweight hashed logistic critic checkpoint at `critic.json`
+  - optional trainer hook via `algorithm.enable_causal_spatial_critic`
+
+## Paper-grade Extension Status
+
+The current implementation now includes the offline Causal Spatial Critic
+bridge pipeline. It follows an EVO-RAG-style staged organization:
+
+1. build intervention-label examples
+2. train a small causal reward model
+3. evaluate the checkpoint independently
+4. later consume critic scores inside CSR-GRPO
+
+- paper idea: `docs/paper_idea_causal_spatial_critic.md`
+- code plan: `docs/causal_spatial_critic_dev.md`
+- proposed model: `CausalSpatialCritic(q, E, step, intervention_type) -> P(answer changes)`
+- role: bridge expensive step-level intervention labels into dense CSR-GRPO rewards
+- implemented: offline data, training, checkpoint, evaluation, optional trainer scoring hook, and tests
+- pending: online refresh scheduler, GPU/Ray/vLLM verification, and paper-grade encoder option
+
+This proposed critic is separate from the existing PPO value critic in
+`verl/workers/critic/`.
 
 ## Verification Completed In This Environment
 
@@ -47,9 +78,15 @@ python3 -m py_compile \
   scripts/check_csrfaith_ready.py \
   scripts/debug_csr_batch.py \
   scripts/build_csr_target_cache.py \
+  scripts/build_causal_critic_dataset.py \
+  scripts/train_causal_spatial_critic.py \
+  scripts/evaluate_causal_spatial_critic.py \
   scripts/model_merger.py \
   tests/test_check_csrfaith_ready.py \
   tests/test_build_csr_target_cache.py \
+  tests/test_causal_critic_data.py \
+  tests/test_causal_critic_scripts.py \
+  tests/test_causal_spatial_critic_static.py \
   tests/test_counterfactual.py \
   tests/test_dataset.py \
   tests/test_debug_csr_batch.py \
@@ -63,9 +100,11 @@ python3 -m py_compile \
   tests/test_trainer_static.py \
   tests/test_csr_advantage.py \
   verl/utils/answer_normalization.py \
+  verl/utils/causal_critic_data.py \
   verl/utils/causal_rationale.py \
   verl/utils/step_causal.py \
   verl/utils/counterfactual.py \
+  verl/models/causal_spatial_critic.py \
   verl/utils/reviewer.py \
   verl/utils/dataset.py \
   verl/protocol.py \
@@ -82,7 +121,7 @@ python3 scripts/build_csr_target_cache.py --input-json sample.json --output targ
 Current lightweight test count:
 
 ```text
-73 tests, 13 skipped
+85 tests, 13 skipped
 ```
 
 The skipped tests require training/runtime dependencies such as `numpy`, `torch`, `datasets`, and `transformers`, which are not installed in this local Python environment.

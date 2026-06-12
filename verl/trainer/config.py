@@ -90,6 +90,10 @@ class AlgorithmConfig:
     csr_step_cfs_alpha: float = 0.1
     csr_max_steps: int = 6
     csr_max_step_interventions: int = 1
+    enable_causal_spatial_critic: bool = False
+    causal_critic_path: str = ""
+    causal_critic_min_target_confidence: float = 0.0
+    causal_critic_use_online_fallback: bool = True
     tau_coverage: float = 0.7
     tau_step_cfs: float = 0.5
     lambda_coverage_init: float = 0.0

@@ -25,3 +25,6 @@ export WANDB_MODE=offline
 # （可选）模型 / 数据集改用本地绝对路径而非自动下载
 # export MODEL_PATH="/path/to/Qwen2.5-VL-7B-Instruct"
 # export DATA_FILE="/path/to/STVQA-7K"
+
+# （可选）Causal Spatial Critic checkpoint，用于 csrfaith_critic_*.sh
+# export CAUSAL_CRITIC_PATH="${DATA_ROOT}/ckpts/causal_spatial_critic"

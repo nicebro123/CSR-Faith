@@ -14,7 +14,7 @@
 2. 奖励忠实视觉推理：覆盖必要事实，避免无关事实，保持紧凑且充分。
 3. 做步级因果验证：逐步干预 CoT，让策略模型续写答案，检查答案是否改变。
 
-📚 深入文档：[方法/模块详解](docs/method_and_modules.md) · [设计文档](docs/causal_spatial_rationales_dev.md) · [逐步执行手册](docs/csrfaith_run_guide.md)
+📚 深入文档：[方法/模块详解](docs/method_and_modules.md) · [设计文档](docs/causal_spatial_rationales_dev.md) · [论文设想](docs/paper_idea_causal_spatial_critic.md) · [critic 开发计划](docs/causal_spatial_critic_dev.md) · [逐步执行手册](docs/csrfaith_run_guide.md)
 
 ---
 
@@ -26,9 +26,31 @@
 | **CSR Reward** | 用 coverage / precision / compactness / sufficiency / necessity 奖励忠实空间 CoT | 不需要额外模型 |
 | **Step-level CFS** | 对每个推理步做关系翻转、实体交换、步掩码，再前缀续写答案 | 使用当前策略模型 |
 | **GRPO Integration** | 将 rationale score 与 step-CFS 注入 GRPO advantage，并保存/恢复拉格朗日乘子 | 训练框架内完成 |
+| **Causal Spatial Critic** | 小型因果桥接模型，学习预测推理步被干预后答案是否改变，用于替代部分昂贵 step-CFS | 离线数据/训练/评估 + 可选 GRPO 接入已实现 |
 | **CIT-Faith Baseline** | LLM Judge 评估 SC/PR + counterfactual CFS，可作为对照或组合实验 | 需审查模型(AWQ) |
 
 ---
+
+## Causal Spatial Critic 离线闭环
+
+当前已按 EVO-RAG 式阶段组织实现离线 bridge 训练链路：先生成 intervention-label JSONL，再训练轻量 critic，最后独立评估 checkpoint。
+
+```bash
+python3 scripts/build_causal_critic_dataset.py \
+  --input-json rollouts.jsonl \
+  --output cache/causal_critic/train.jsonl \
+  --drop-invalid-labels
+
+python3 scripts/train_causal_spatial_critic.py \
+  --train-jsonl cache/causal_critic/train.jsonl \
+  --output-dir ckpts/causal_spatial_critic
+
+python3 scripts/evaluate_causal_spatial_critic.py \
+  --critic-path ckpts/causal_spatial_critic \
+  --eval-jsonl cache/causal_critic/train.jsonl
+```
+
+`rollouts.jsonl` 应包含原始 `problem` / `ground_truth` / `response`，以及在线 step-CFS 得到的 `counterfactual_answers`。原数据集仍不修改。训练时可设置 `CAUSAL_CRITIC_PATH` 后运行 `scripts/csrfaith_critic_smoke.sh` 或 `scripts/csrfaith_critic_7b_grpo.sh`，把 critic checkpoint 接入 CSR-GRPO。
 
 ## 快速开始
 

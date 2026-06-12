@@ -4,6 +4,7 @@ import unittest
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RAY_TRAINER_PATH = os.path.join(REPO_ROOT, "verl", "trainer", "ray_trainer.py")
+CONFIG_PATH = os.path.join(REPO_ROOT, "verl", "trainer", "config.py")
 
 
 class RayTrainerStaticTest(unittest.TestCase):
@@ -85,6 +86,27 @@ class RayTrainerStaticTest(unittest.TestCase):
         self.assertIn('multi_modal_data_all=batch.non_tensor_batch.get("_continuation_multi_modal_data")', text)
         self.assertIn("max_prefix_tokens=max_continuation_prefix_tokens", text)
         self.assertIn('batch.non_tensor_batch.pop("_continuation_multi_modal_data", None)', text)
+
+    def test_causal_spatial_critic_is_optional_and_separate_from_ppo_critic(self):
+        text = self._trainer_text()
+        self.assertIn("from ..models.causal_spatial_critic import CausalSpatialCritic", text)
+        self.assertIn("from ..utils.causal_critic_data import build_critic_examples", text)
+        self.assertIn("self.causal_spatial_critic = None", text)
+        self.assertIn("CausalSpatialCritic.load(critic_path)", text)
+        self.assertIn("causal_critic_use_online_fallback", text)
+        self.assertIn("build_critic_examples(", text)
+        self.assertIn("self.causal_spatial_critic.score_batch(critic_examples)", text)
+        self.assertIn('metrics["csr/causal_signal_is_critic"]', text)
+        self.assertIn('metrics["csr/critic_causal_mean"]', text)
+        self.assertIn("self.critic_wg", text)
+
+    def test_causal_spatial_critic_config_fields_exist(self):
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn("enable_causal_spatial_critic: bool = False", text)
+        self.assertIn('causal_critic_path: str = ""', text)
+        self.assertIn("causal_critic_min_target_confidence: float = 0.0", text)
+        self.assertIn("causal_critic_use_online_fallback: bool = True", text)
 
 
 if __name__ == "__main__":
