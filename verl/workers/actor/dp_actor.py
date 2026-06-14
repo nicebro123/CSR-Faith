@@ -286,6 +286,16 @@ class DataParallelPPOActor(BasePPOActor):
                     }
                     append_to_dict(metrics, batch_metrics)
 
+                # Release temporary tensors from the last micro-batch before the optimizer
+                # step; single-GPU VL smoke tests run very close to the memory limit.
+                try:
+                    del micro_batch, model_inputs, responses, attention_mask, response_mask
+                    del old_log_probs, advantages, log_probs, entropy_loss, pg_loss
+                    del pg_clipfrac_higher, pg_clipfrac_lower, ppo_kl, loss
+                except UnboundLocalError:
+                    pass
+                torch.cuda.empty_cache()
+
                 grad_norm = self._optimizer_step()
                 append_to_dict(metrics, {"actor/grad_norm": grad_norm.detach().item()})
 

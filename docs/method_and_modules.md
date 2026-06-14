@@ -111,7 +111,7 @@ python3 scripts/check_csrfaith_ready.py --no-fail
 bash scripts/csrfaith_smoke.sh
 ```
 
-该脚本将训练缩到 `trainer.max_steps=2`、`rollout.n=2`、小 batch、关闭验证、中间保存和 KL/ref policy，用于先检查 CSR 训练链路是否能跑通；关闭验证时不会加载 val dataloader，训练结束仍会保存最终 checkpoint。
+该脚本将训练缩到 `trainer.max_steps=2`、`rollout.n=2`、小 batch、关闭验证、中间保存和 KL/ref policy，用于先检查 CSR 训练链路是否能跑通；关闭验证时不会加载 val dataloader。默认 `trainer.save_freq=-1` 会跳过 checkpoint 保存，如需验证存取链路可显式设置 `trainer.save_freq=1`。
 
 ### 4. 离线调试 CSR 派生监督
 

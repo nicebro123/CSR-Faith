@@ -18,6 +18,7 @@ When working with FSDP:
 - Utilize state_dict from the FSDP to synchronize the weights among tp ranks in vLLM
 """
 
+import inspect
 import os
 from contextlib import contextmanager
 from typing import Any, List, Union
@@ -28,6 +29,7 @@ import torch.distributed
 from tensordict import TensorDict
 from transformers import PreTrainedTokenizer
 from vllm import LLM, RequestOutput, SamplingParams
+from vllm.engine.arg_utils import EngineArgs
 
 from ...protocol import DataProto
 from ...utils import torch_functional as VF
@@ -68,26 +70,30 @@ class vLLMRollout(BaseRollout):
         if config.limit_images > 0:
             vllm_init_kwargs = {"limit_mm_per_prompt": {"image": config.limit_images}}
 
-        self.inference_engine = LLM(
-            model=model_path,
-            skip_tokenizer_init=False,
-            tensor_parallel_size=config.tensor_parallel_size,
-            dtype=PrecisionType.to_str(PrecisionType.to_dtype(config.dtype)),
-            gpu_memory_utilization=config.gpu_memory_utilization,
-            enforce_eager=config.enforce_eager,
-            max_model_len=config.prompt_length + config.response_length,
-            max_num_batched_tokens=config.max_num_batched_tokens,
-            enable_sleep_mode=True,
-            distributed_executor_backend="external_launcher",
-            disable_custom_all_reduce=True,
-            disable_mm_preprocessor_cache=True,
-            disable_log_stats=config.disable_log_stats,
-            enable_chunked_prefill=config.enable_chunked_prefill,
+        llm_kwargs = {
+            "model": model_path,
+            "skip_tokenizer_init": False,
+            "tensor_parallel_size": config.tensor_parallel_size,
+            "dtype": PrecisionType.to_str(PrecisionType.to_dtype(config.dtype)),
+            "gpu_memory_utilization": config.gpu_memory_utilization,
+            "enforce_eager": config.enforce_eager,
+            "max_model_len": config.prompt_length + config.response_length,
+            "max_num_batched_tokens": config.max_num_batched_tokens,
+            "enable_sleep_mode": True,
+            "distributed_executor_backend": "external_launcher",
+            "disable_custom_all_reduce": True,
+            "disable_mm_preprocessor_cache": True,
+            "disable_log_stats": config.disable_log_stats,
+            "enable_chunked_prefill": config.enable_chunked_prefill,
             **vllm_init_kwargs,
-        )
+        }
+        engine_arg_names = set(inspect.signature(EngineArgs).parameters)
+        llm_kwargs = {key: value for key, value in llm_kwargs.items() if key in engine_arg_names}
+        self.inference_engine = LLM(**llm_kwargs)
 
-        # Offload vllm model to reduce peak memory usage
-        self.inference_engine.sleep(level=1)
+        # Offload vllm model to reduce peak memory usage when supported by the installed vLLM version.
+        if hasattr(self.inference_engine, "sleep"):
+            self.inference_engine.sleep(level=2)
 
         sampling_kwargs = {"max_tokens": config.response_length, "detokenize": False}
         default_sampling_params = SamplingParams()

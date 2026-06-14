@@ -304,6 +304,7 @@ class FSDPWorker(Worker):
                     lr=optim_config.lr,
                     betas=optim_config.betas,
                     weight_decay=optim_config.weight_decay,
+                    use_kahan_summation=False,
                 )
             else:
                 raise NotImplementedError(f"Optimizer {optim_config.strategy} not supported.")

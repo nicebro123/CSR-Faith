@@ -174,7 +174,7 @@ bash scripts/csrfaith_smoke.sh
 MODEL_PATH=Qwen/Qwen2.5-VL-3B-Instruct N_GPUS=1 bash scripts/csrfaith_smoke.sh
 ```
 
-该脚本固定为 `max_steps=2`、`rollout.n=2`、小 batch、`max_response_length=512`、关闭验证、中间保存和 KL/ref policy、`csr_max_steps=2`；关闭验证时不会加载 val dataloader，训练结束仍会强制保存最终 checkpoint。
+该脚本固定为 `max_steps=2`、`rollout.n=2`、小 batch、`max_response_length=512`、关闭验证、中间保存和 KL/ref policy、`csr_max_steps=2`；关闭验证时不会加载 val dataloader。默认 `trainer.save_freq=-1` 会跳过 checkpoint 保存，如需验证存取链路可显式设置 `trainer.save_freq=1`。
 
 **通过标准（对照 `docs/csrfaith_implementation_status.md`）：**
 - 启动无 OmegaConf key 报错
@@ -275,7 +275,7 @@ algorithm.dual_lr=0.01
 
 ### 跑正式训练前必须知道的两点
 
-1. **中间 checkpoint 默认会保存并保留**：`csrfaith_7b_grpo.sh` 显式设置 `trainer.save_freq=25` 和 `trainer.save_limit=3`，因此 75 step 训练默认保留 `global_step_25`、`global_step_50`，训练结束还会强制保存并保留 `global_step_75`。
+1. **中间 checkpoint 默认会保存并保留**：`csrfaith_7b_grpo.sh` 显式设置 `trainer.save_freq=25` 和 `trainer.save_limit=3`，因此 75 step 训练默认保留 `global_step_25`、`global_step_50`、`global_step_75`。如果追加 `trainer.save_freq=-1`，训练结束不会额外保存 checkpoint。
    - 默认路径是 `$DATA_ROOT/ckpts/csrfaith_7B/`。
    - 想减少存档可追加 `trainer.save_freq=-1`；想保留更多续训点可追加 `trainer.save_freq=15 trainer.save_limit=3`。
 2. **wandb 默认离线**：脚本顶部设置了 `WANDB_MODE=offline`，日志会写到本地 `wandb/` 目录，不要求联网登录。也可以命令行追加 `trainer.logger='["console"]'` 完全关掉 wandb。

@@ -314,16 +314,40 @@ class AnyPrecisionAdamW(torch.optim.Optimizer):
                 step_size = lr / bias_correction1
 
                 denom_correction = (1 - beta2**step) ** 0.5  # adjust using bias2 and avoids math import
-                centered_variance = (exp_avg_sq.sqrt() / denom_correction).add_(eps, alpha=1)
+                # Avoid allocating optimizer temporaries as large as the whole parameter.
+                # Single-GPU VL runs can sit within a few hundred MB of OOM during AdamW.
+                chunk_size = 8 * 1024 * 1024
+                if p.numel() > chunk_size:
+                    flat_p = p.data.view(-1)
+                    flat_exp_avg = exp_avg.view(-1)
+                    flat_exp_avg_sq = exp_avg_sq.view(-1)
+                    flat_compensation = state["compensation"].view(-1) if use_kahan_summation else None
+                    for start in range(0, p.numel(), chunk_size):
+                        end = min(start + chunk_size, p.numel())
+                        centered_variance = (
+                            flat_exp_avg_sq[start:end].sqrt() / denom_correction
+                        ).add_(eps, alpha=1)
+                        if use_kahan_summation:
+                            compensation = flat_compensation[start:end]
+                            compensation.addcdiv_(flat_exp_avg[start:end], centered_variance, value=-step_size)
+                            temp_buffer = flat_p[start:end].clone()
+                            flat_p[start:end].add_(compensation)
+                            compensation.add_(temp_buffer.sub_(flat_p[start:end]))
+                        else:
+                            flat_p[start:end].addcdiv_(
+                                flat_exp_avg[start:end], centered_variance, value=-step_size
+                            )
+                else:
+                    centered_variance = (exp_avg_sq.sqrt() / denom_correction).add_(eps, alpha=1)
 
-                if use_kahan_summation:  # lr update to compensation
-                    compensation = state["compensation"]
-                    compensation.addcdiv_(exp_avg, centered_variance, value=-step_size)
+                    if use_kahan_summation:  # lr update to compensation
+                        compensation = state["compensation"]
+                        compensation.addcdiv_(exp_avg, centered_variance, value=-step_size)
 
-                    # update weights with compensation (Kahan summation)
-                    # save error back to compensation for next iteration
-                    temp_buffer = p.detach().clone()
-                    p.data.add_(compensation)
-                    compensation.add_(temp_buffer.sub_(p.data))
-                else:  # usual AdamW updates
-                    p.data.addcdiv_(exp_avg, centered_variance, value=-step_size)
+                        # update weights with compensation (Kahan summation)
+                        # save error back to compensation for next iteration
+                        temp_buffer = p.detach().clone()
+                        p.data.add_(compensation)
+                        compensation.add_(temp_buffer.sub_(p.data))
+                    else:  # usual AdamW updates
+                        p.data.addcdiv_(exp_avg, centered_variance, value=-step_size)
